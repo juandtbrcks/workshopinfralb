@@ -7,14 +7,15 @@ Esto NO se crea solo — hay que ejecutarlo una vez.
 ## 1. Obtén el client_id del SP de la app
 
 ```bash
-databricks apps get asistente-infra -p fe-vm-jgworkspaceclassic -o json \
+databricks apps get asistente-infra -p <perfil> -o json \
   | jq -r '.service_principal_client_id'
-# → 6c2172c8-3e62-4244-beb2-7d4395f0ae2e   (ejemplo)
+# → un UUID, p.ej. 00000000-0000-0000-0000-000000000000
 ```
 
 ## 2. Crea el rol OAuth y otorga permisos
 
-Conéctate a la base `infra_ws` como tu usuario (admin) y ejecuta, sustituyendo `<SP>`:
+Conéctate a tu base del workshop como tu usuario (admin) y ejecuta, sustituyendo `<SP>` por el
+client_id del paso anterior:
 
 ```sql
 -- Habilita el helper de identidades de Databricks (una vez)

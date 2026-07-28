@@ -56,38 +56,43 @@ Datos curados con sentido de negocio de Grupo Infra, incluidos como **archivos P
 
 ## Databricks App: "Asistente de Operaciones INFRA"
 
-App FastAPI + Leaflet desplegada que integra las 3 capacidades sobre Lakebase (código en `app/`):
+App FastAPI + Leaflet (opcional) que integra las 3 capacidades sobre Lakebase (código en `app/`):
 
 - **💬 Asistente** — chat con RAG semántico (`pgvector` + Claude) y memoria de conversación persistente.
 - **🗺️ Reparto** — mapa interactivo (PostGIS): planta más cercana, radios de cobertura.
 - **📊 Panel** — métricas operativas en vivo desde Lakebase.
 
-**URL:** https://asistente-infra-7474648405668119.aws.databricksapps.com
-(requiere login SSO del workspace)
+Al desplegarla en tu workspace obtienes una URL propia
+(`https://<nombre-app>-<workspace-id>.<región>.databricksapps.com`, con login SSO).
 
 > ⚠️ **Setup obligatorio de permisos:** el service principal de la app necesita un rol OAuth
 > en Lakebase. Ver `app/setup_permisos.md`. Sin esto, la app no conecta a la base.
 
-Desplegar cambios:
+Desplegar (sustituye `<perfil>` por tu perfil de la CLI y `<tu-email>` por tu usuario):
 ```bash
 cd app
+databricks apps create asistente-infra -p <perfil>
 databricks sync . /Workspace/Users/<tu-email>/apps/asistente-infra \
-  --exclude .venv --exclude __pycache__ -p fe-vm-jgworkspaceclassic
+  --exclude .venv --exclude __pycache__ -p <perfil>
 databricks apps deploy asistente-infra \
-  --source-code-path /Workspace/Users/<tu-email>/apps/asistente-infra -p fe-vm-jgworkspaceclassic
+  --source-code-path /Workspace/Users/<tu-email>/apps/asistente-infra -p <perfil>
 ```
+
+> Antes de desplegar, ajusta los `value:` de `app/app.yaml` con los mismos nombres de proyecto
+> Lakebase, base de datos y endpoints que definiste en `notebooks/config.py`.
 
 ## Entorno de referencia
 
-Valores usados durante el desarrollo (**úsalos como referencia**; en tu tenant defines los tuyos
-en `config` — ver [SETUP.md](SETUP.md)):
+Los notebooks no traen valores fijos: **todo se define en `notebooks/config.py`** (ver
+[SETUP.md](SETUP.md)). Como punto de partida sugerido:
 
-- **Proyecto Lakebase:** `grupo-infra-ws` (tier Autoscaling)
-- **Base de datos:** `infra_ws`
-- **Extensiones:** `vector` 0.8.0, `postgis` 3.5.0 (las habilita `00_setup_conexion`)
+- **Proyecto Lakebase:** tier Autoscaling (nombre a tu elección, p.ej. `grupo-infra-ws`)
+- **Base de datos:** p.ej. `infra_ws`
+- **Extensiones:** `vector` + `postgis` (las habilita `00_setup_conexion` automáticamente)
 - **Foundation Models:**
   - Embeddings: `databricks-qwen3-embedding-0-6b` (multilingüe, 1024 dims)
   - Chat/RAG: `databricks-claude-opus-4-8`
+  - *(ajusta a los endpoints disponibles en tu workspace)*
 
 > Verificado end-to-end: las 4 fases corren contra Lakebase real (memoria + upserts, búsqueda
 > semántica en español, consultas PostGIS, y branching con aislamiento de producción confirmado).
@@ -141,10 +146,12 @@ instructor asignó otro proyecto/branch por participante, ajústalos ahí.
   evitar colisión de nombres.
 - **Costo:** el proyecto es Autoscaling (escala a cero). Cada branch levanta cómputo temporal
   (0.5–2 CU). Borra branches sobrantes con
-  `databricks postgres delete-branch projects/grupo-infra-ws/branches/<branch> -p fe-vm-jgworkspaceclassic`.
+  `databricks postgres delete-branch projects/<tu-proyecto>/branches/<branch> -p <perfil>`.
 
 ## Limpieza total (post-workshop)
 
+Sustituye `<tu-proyecto>` por el nombre de tu proyecto Lakebase y `<perfil>` por tu perfil de la CLI:
+
 ```bash
-databricks postgres delete-project projects/grupo-infra-ws -p fe-vm-jgworkspaceclassic
+databricks postgres delete-project projects/<tu-proyecto> -p <perfil>
 ```
