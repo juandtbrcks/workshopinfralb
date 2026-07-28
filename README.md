@@ -3,6 +3,11 @@
 Notebooks ejecutables para la **Fase 3 de la agenda**: *Desarrollo de una Aplicación Agéntica*
 sobre Lakebase (70 min). Audiencia mixta (técnica + negocio).
 
+> ### 🚀 ¿Empiezas desde cero en tu propio workspace?
+> Sigue **[SETUP.md](SETUP.md)** — guía paso a paso por la **interfaz gráfica** para importar el
+> repo, crear el proyecto Lakebase, la base de datos, el catálogo/esquema y ajustar `config`.
+> Todo lo demás en este README asume que esa infra ya existe.
+
 ## Hilo conductor
 
 Construimos el **"Asistente de Operaciones INFRA"**, un agente para el equipo de logística y
@@ -72,32 +77,29 @@ databricks apps deploy asistente-infra \
   --source-code-path /Workspace/Users/<tu-email>/apps/asistente-infra -p fe-vm-jgworkspaceclassic
 ```
 
-## Entorno (ya aprovisionado)
+## Entorno de referencia
 
-- **Workspace:** `fevm-jgworkspaceclassic` (perfil CLI `fe-vm-jgworkspaceclassic`)
+Valores usados durante el desarrollo (**úsalos como referencia**; en tu tenant defines los tuyos
+en `config` — ver [SETUP.md](SETUP.md)):
+
 - **Proyecto Lakebase:** `grupo-infra-ws` (tier Autoscaling)
 - **Base de datos:** `infra_ws`
-- **Extensiones habilitadas:** `vector` 0.8.0, `postgis` 3.5.0
-- **Foundation Models usados:**
+- **Extensiones:** `vector` 0.8.0, `postgis` 3.5.0 (las habilita `00_setup_conexion`)
+- **Foundation Models:**
   - Embeddings: `databricks-qwen3-embedding-0-6b` (multilingüe, 1024 dims)
   - Chat/RAG: `databricks-claude-opus-4-8`
 
-> Estado verificado end-to-end el 2026-07-27: las 4 fases corren contra Lakebase real
-> (memoria + upserts, búsqueda semántica en español, consultas PostGIS, y branching con
-> aislamiento de producción confirmado).
+> Verificado end-to-end: las 4 fases corren contra Lakebase real (memoria + upserts, búsqueda
+> semántica en español, consultas PostGIS, y branching con aislamiento de producción confirmado).
 
-## Cómo importar los notebooks al workspace
+## Cómo importar el repo al workspace
 
-Opción A — CLI (recomendada):
-```bash
-databricks workspace import-dir \
-  ./notebooks /Workspace/Users/<tu-email>/grupo-infra-lakebase \
-  -p fe-vm-jgworkspaceclassic
-```
+**Recomendado — Git Folder (Repos):** Workspace → **Create → Git folder** → URL
+`https://github.com/juandtbrcks/workshopinfralb`. Los `.py` se abren como notebooks. Ver
+[SETUP.md](SETUP.md) para el paso a paso.
 
-Opción B — UI: Workspace → Import → selecciona los `.py` (formato *source*, se abren como notebooks).
-
-Los notebooks usan `%run ./00_setup_conexion`, así que **deben quedar en la misma carpeta**.
+Los notebooks usan `%run ./00_setup_conexion` y `%run ./config`, así que **deben quedar en la
+misma carpeta** (importar el repo completo lo garantiza).
 
 ## Cómo correr el lab
 
