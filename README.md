@@ -108,21 +108,19 @@ misma carpeta** (importar el repo completo lo garantiza).
 
 ## Cómo correr el lab
 
-> **Modelo del taller (7 participantes):** infraestructura **compartida** (proyecto Lakebase +
-> tablas Delta, creados por el instructor una vez) y una **base de datos por participante** para
-> que nadie pise los datos de los demás. Detalle completo en **[SETUP.md](SETUP.md)**.
+> **Modelo del taller (7 participantes):** **cada quien crea y usa su propia infraestructura** —
+> su proyecto Lakebase, su esquema en Unity Catalog y su branch. Todos son independientes; el
+> instructor solo guía. Setup completo por la UI en **[SETUP.md](SETUP.md)** (~10 min).
 
-**Instructor (una vez):** ajusta lo compartido en `config` y corre **`00_ingesta_datos`** —
-carga los Parquet de `data/parquet/` a las tablas Delta.
-
-**Cada participante:**
-1. En `config`, edita **solo** `PARTICIPANTE = "tus-iniciales"`. Tu base
-   (`infra_ws_<iniciales>`) y tu branch de la Fase 4 quedan aislados. No cambies los valores compartidos.
-2. Adjunta los notebooks a un cluster **serverless** (el SDK ya viene).
-3. Corre **`05_bootstrap_datos`** — crea tu base y la siembra (embeddings + geometrías) desde el
-   Delta compartido.
-4. Corre `01_fase1` → `04_fase4` en orden. La **primera celda** de cada uno instala dependencias
-   y reinicia Python; luego `%run ./00_setup_conexion` (que carga `config` y **crea tu base** si no existe).
+Cada participante:
+1. Crea **su proyecto Lakebase** en la UI (ver SETUP.md) e importa el repo como Git Folder.
+2. En `config`, edita **solo** `PARTICIPANTE = "tus-iniciales"`. De ahí se derivan tu proyecto
+   (`infra-ws-<iniciales>`) y tu esquema (`infra_lakebase_ws_<iniciales>`).
+3. Adjunta los notebooks a un cluster **serverless** y corre en orden:
+   - **`00_ingesta_datos`** — crea tu esquema y carga los Parquet a tablas Delta.
+   - **`05_bootstrap_datos`** — crea tu base Lakebase y la siembra (embeddings + geometrías).
+   - **`01_fase1` → `04_fase4`** — las fases. La **primera celda** de cada una instala dependencias
+     y reinicia Python; luego `%run ./00_setup_conexion` (que carga `config` y crea tu base si no existe).
 
 **De dónde salen los datos de cada fase:**
 - **Fase 1** — lee un cliente hospitalario real de `clientes_geo`; los mensajes de la
@@ -132,28 +130,26 @@ carga los Parquet de `data/parquet/` a las tablas Delta.
 - **Fase 4** — lee la tabla `productos` (debe estar sembrada en Lakebase por `05_bootstrap_datos`)
   y experimenta con precios sobre un branch aislado.
 
-### Parámetros (widgets)
+### Parámetros
 
 Todo se define en `config`. El único valor que cada participante cambia es `PARTICIPANTE`;
-de ahí se derivan su base de datos y su branch. `00_setup_conexion` también expone los valores de
-Lakebase como *widgets* por si quieres override interactivo.
+de ahí se derivan su proyecto Lakebase y su esquema. `00_setup_conexion` también expone los valores
+de Lakebase como *widgets* por si quieres override interactivo.
 
 ## Notas para el instructor
 
 - **Tokens OAuth** expiran ~1 h. Si una fase falla por autenticación, re-ejecuta la celda de
   `get_connection()` (regenera el token).
-- **Aislamiento entre participantes:** cada quien tiene su **base** `infra_ws_<PARTICIPANTE>` (toda
-  la escritura ocurre ahí) y su **branch** `experimento-<PARTICIPANTE>` en la Fase 4. Las tablas
-  Delta de UC son compartidas y de solo lectura. 7 bases están muy por debajo del límite (500/branch).
+- **Aislamiento entre participantes:** cada quien tiene **su propio proyecto Lakebase**
+  (`infra-ws-<PARTICIPANTE>`) y **su propio esquema** UC (`infra_lakebase_ws_<PARTICIPANTE>`). Con 7
+  proyectos estás dentro del límite del workspace (10 instancias) — verifícalo si hay otros en uso.
 - **Fase 2** (embeddings en español): elegimos el modelo *multilingüe* `qwen3` a propósito —
   los modelos solo-inglés (`bge`/`gte`) dan relevancia notablemente peor sobre texto en español.
   Es un buen punto de discusión de diseño de RAG con la audiencia.
-- **Fase 4** (branching): el nombre del branch ya es único por participante (`experimento-<PARTICIPANTE>`),
-  así que no hay colisiones aunque corran a la vez. `create_branch` auto-crea el endpoint `primary`
-  y el branch se borra al final (cascada).
-- **Costo:** el proyecto es Autoscaling (escala a cero). Cada branch levanta cómputo temporal
-  (0.5–2 CU). Borra branches sobrantes con
-  `databricks postgres delete-branch projects/<tu-proyecto>/branches/<branch> -p <perfil>`.
+- **Fase 4** (branching): `create_branch` auto-crea el endpoint `primary` y el branch se borra al
+  final (cascada). Como cada quien tiene su propio proyecto, no hay colisiones de nombres.
+- **Costo:** cada proyecto es Autoscaling (escala a cero). Al terminar, cada participante borra su
+  proyecto (Compute → Database instances → Delete) para no dejar cómputo activo.
 
 ## Limpieza total (post-workshop)
 
