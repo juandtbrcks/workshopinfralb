@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Databricks
+.databricks/
+
+# OS
+.DS_Store
+
+# Node (por si se agrega frontend con build)
+node_modules/

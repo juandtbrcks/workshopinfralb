@@ -1,0 +1,23 @@
+command:
+  - "python"
+  - "-m"
+  - "uvicorn"
+  - "app:app"
+  - "--host"
+  - "0.0.0.0"
+  - "--port"
+  - "8000"
+
+env:
+  - name: LAKEBASE_PROJECT
+    value: grupo-infra-ws
+  - name: LAKEBASE_BRANCH
+    value: production
+  - name: LAKEBASE_ENDPOINT
+    value: primary
+  - name: LAKEBASE_DB
+    value: infra_ws
+  - name: EMBED_ENDPOINT
+    value: databricks-qwen3-embedding-0-6b
+  - name: CHAT_ENDPOINT
+    value: databricks-claude-opus-4-8
