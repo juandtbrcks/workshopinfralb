@@ -11,25 +11,27 @@
 # COMMAND ----------
 
 # ═══════════════════════════════════════════════════════════════════
-#  👤 EDITA SOLO ESTA LÍNEA
+#  👤 CADA PARTICIPANTE EDITA SOLO ESTA LÍNEA
 # ═══════════════════════════════════════════════════════════════════
 # Pon tus iniciales o nombre corto (solo minúsculas/números, sin espacios).
-# Cada participante crea y usa SU PROPIA infraestructura, totalmente independiente:
-# de este valor se derivan tu proyecto Lakebase, tu esquema y tu branch.
+# El PROYECTO Lakebase y el CATÁLOGO/ESQUEMA son COMPARTIDOS (los crea el participante
+# administrador una vez). De este valor se derivan TU base de datos y TU branch, para
+# que trabajes aislado de tus compañeros.
 PARTICIPANTE = "jgordon"     # ← CÁMBIALO, p.ej. "amlopez", "equipo1", etc.
 
 # ─────────────────────────── Lakebase ───────────────────────────
-# Tu propio proyecto Lakebase (lo creas tú en el Paso de setup). El nombre debe ser
-# DNS-compliant: minúsculas, números y guiones.
-LAKEBASE_PROJECT  = f"infra-ws-{PARTICIPANTE}"
-LAKEBASE_BRANCH   = "production"      # branch raíz que se crea con el proyecto
-LAKEBASE_ENDPOINT = "primary"         # endpoint que se crea con el proyecto
-LAKEBASE_DATABASE = "infra_ws"        # base dentro de TU proyecto
+# El PROYECTO es COMPARTIDO por todo el taller (lo crea el administrador una vez).
+# La BASE DE DATOS es propia de cada participante (deriva de PARTICIPANTE).
+LAKEBASE_PROJECT  = "grupo-infra-ws"            # compartido — no cambiar
+LAKEBASE_BRANCH   = "production"                # compartido — no cambiar
+LAKEBASE_ENDPOINT = "primary"                   # compartido — no cambiar
+LAKEBASE_DATABASE = f"infra_ws_{PARTICIPANTE}"  # propia de cada quien
 
 # ──────────────────── Unity Catalog (datos sintéticos) ────────────────────
-# Catálogo COMPARTIDO (ya existe en el workspace); cada quien su propio ESQUEMA.
-UC_CATALOG = "jgworkspaceclassic_catalog"         # ajusta al catálogo del workspace
-UC_SCHEMA  = f"infra_lakebase_ws_{PARTICIPANTE}"  # tu propio esquema
+# COMPARTIDO por todo el taller: las tablas Delta son de SOLO LECTURA (los notebooks
+# leen de aquí y escriben a Lakebase). El administrador corre la ingesta una sola vez.
+UC_CATALOG = "jgworkspaceclassic_catalog"     # compartido — ajusta al catálogo del taller
+UC_SCHEMA  = "infra_lakebase_ws"              # compartido — no cambiar
 
 # ─────────────────────── Foundation Models ───────────────────────
 # Endpoints del workspace (compartidos). Embeddings multilingüe + LLM para RAG.
@@ -38,8 +40,9 @@ EMBED_DIM      = 1024
 CHAT_ENDPOINT  = "databricks-claude-opus-4-8"
 
 # ─────────────────────────── Fase 4 ───────────────────────────
-# Branch efímero para el experimento de branching (dentro de tu propio proyecto).
-BRANCH_EXPERIMENTO = "experimento-precios"
+# Branch efímero para el experimento de branching — único por participante
+# (el proyecto es compartido, así que dos branches no pueden llamarse igual).
+BRANCH_EXPERIMENTO = f"experimento-{PARTICIPANTE}"
 
 # COMMAND ----------
 
@@ -52,5 +55,5 @@ print(f"  Fase 4       : branch experimento = {BRANCH_EXPERIMENTO}")
 
 import re as _re
 assert _re.fullmatch(r"[a-z0-9]+", PARTICIPANTE), \
-    ("PARTICIPANTE debe ser solo minúsculas ASCII y números, sin espacios, guiones ni acentos "
-     "(el nombre del proyecto Lakebase debe ser DNS-compliant). Ej.: 'jgordon', 'equipo1'.")
+    ("PARTICIPANTE debe ser solo minúsculas ASCII y números, sin espacios, guiones ni acentos. "
+     "Ej.: 'jgordon', 'equipo1'.")

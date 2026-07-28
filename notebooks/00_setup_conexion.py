@@ -118,24 +118,26 @@ def get_connection(**kw):
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 4. Crear la base de datos (si no existe)
+# MAGIC ## 4. Crear tu base de datos (si no existe)
 # MAGIC
-# MAGIC Dentro de **tu propio proyecto Lakebase** creamos la base `infra_ws`. Nos conectamos primero
-# MAGIC a la base `postgres` por defecto para crearla si aún no existe (idempotente).
+# MAGIC Cada participante trabaja en su propia base `infra_ws_<PARTICIPANTE>` dentro del **proyecto
+# MAGIC Lakebase compartido**. Nos conectamos primero a la base `postgres` por defecto para crearla
+# MAGIC si aún no existe (idempotente).
 # MAGIC
-# MAGIC > Si esto falla con un error de proyecto/endpoint no encontrado, es que **aún no creaste tu
-# MAGIC > proyecto Lakebase** `{LAKEBASE_PROJECT}` en la UI. Revisa el Paso correspondiente de `SETUP.md`.
+# MAGIC > Si esto falla con un error de proyecto/endpoint no encontrado, es que el **proyecto Lakebase
+# MAGIC > compartido** `{LAKEBASE_PROJECT}` aún no existe. El **participante administrador** debe crearlo
+# MAGIC > una vez en la UI (ver `SETUP.md`).
 
 # COMMAND ----------
 
-# Validación temprana con mensaje claro si el proyecto Lakebase no existe todavía
+# Validación temprana con mensaje claro si el proyecto Lakebase compartido no existe todavía
 try:
     _eps = list(_w.postgres.list_endpoints(f"projects/{PROJECT_ID}/branches/{BRANCH}"))
 except Exception as e:
     raise RuntimeError(
-        f"No encuentro el proyecto Lakebase 'projects/{PROJECT_ID}' (branch '{BRANCH}'). "
-        f"Créalo primero en la UI (Compute → Database instances → Create) con el nombre "
-        f"'{PROJECT_ID}'. Ver SETUP.md."
+        f"No encuentro el proyecto Lakebase compartido 'projects/{PROJECT_ID}' (branch '{BRANCH}'). "
+        f"El participante administrador debe crearlo una vez en la UI "
+        f"(Compute → Database instances → Create) con el nombre '{PROJECT_ID}'. Ver SETUP.md."
     ) from e
 
 _admin = get_connection(database="postgres")
