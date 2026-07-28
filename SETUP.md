@@ -1,141 +1,118 @@
-# 🛠️ Setup desde cero (tenant del cliente)
+# 🛠️ Setup del Workshop (tenant del cliente)
 
-Guía para preparar el workshop en **un workspace nuevo**, creando la infraestructura desde la
-**interfaz gráfica** de Databricks. Al terminar, editas un solo archivo (`notebooks/config.py`)
-y ya puedes correr el lab.
+Guía para preparar el workshop en **un workspace nuevo**, desde la **interfaz gráfica** de Databricks.
 
 > **Requisito del workspace:** debe ser *serverless* con **Lakebase** habilitado y acceso a
 > **Foundation Model APIs**. Si no estás seguro, tu administrador de Databricks puede confirmarlo.
 
----
+## Modelo del taller (7 participantes)
 
-## Paso 1 · Importar el repositorio como Git Folder
-
-1. En la barra lateral, ve a **Workspace** → tu carpeta → **Create** → **Git folder**.
-   (También: **Repos** → **Add Repo**.)
-2. En **Git repository URL** pega:
-   ```
-   https://github.com/juandtbrcks/workshopinfralb
-   ```
-3. **Git provider:** GitHub. Deja el nombre de carpeta como `workshopinfralb`.
-4. Click **Create Git folder**. Los notebooks aparecerán listos (los `.py` se abren como notebooks).
+- **Infraestructura compartida** (la crea el **instructor una sola vez**): un proyecto Lakebase,
+  el catálogo/esquema de Unity Catalog con las tablas Delta, y la ingesta de datos.
+- **Espacio propio por participante:** cada quien trabaja en su **propia base de datos**
+  (`infra_ws_<tus-iniciales>`) dentro del proyecto compartido, y en su **propio branch** en la
+  Fase 4. Así nadie pisa los datos de los demás.
 
 ---
 
-## Paso 2 · Crear el proyecto Lakebase (UI)
+# PARTE A · Instructor (una sola vez)
 
-1. En el selector de la barra lateral, abre **Compute** → pestaña **Database instances**
-   (o la app **Lakebase / Postgres** desde el switcher de apps, según tu versión).
-2. Click **Create database instance** / **New project**.
+## A1 · Importar el repositorio como Git Folder
+
+1. **Workspace** → **Create** → **Git folder**.
+2. **Git repository URL:** `https://github.com/juandtbrcks/workshopinfralb` · Provider: GitHub.
+3. **Create Git folder**. (Cada participante hará esto también en su propia carpeta.)
+
+## A2 · Crear el proyecto Lakebase (compartido)
+
+1. Barra lateral → **Compute** → pestaña **Database instances** (o la app **Lakebase/Postgres**).
+2. **Create database instance** / **New project**.
 3. En el diálogo:
-   - **Name / Display name:** `grupo-infra-ws` *(puedes usar otro; lo pondrás en `config`)*.
-   - **Postgres version:** deja la default (PostgreSQL 17).
-   - **Capacity / Autoscaling:** deja los valores por defecto (autoscaling, scale-to-zero activo).
-4. Click **Create**. Esto crea automáticamente:
-   - un branch **`production`**,
-   - un endpoint/compute primario **`primary`** (read-write),
-   - la base por defecto `databricks_postgres`.
-5. Espera a que el estado quede **Available / Active** (1–2 min).
+   - **Name:** `grupo-infra-ws` *(si usas otro, cámbialo en `config.py`)*.
+   - **Postgres version:** default (PostgreSQL 17).
+   - **Capacity:** default (autoscaling, scale-to-zero activo).
+4. **Create**. Se crean el branch `production`, el endpoint `primary` y la base `databricks_postgres`.
+5. Espera a **Available / Active** (1–2 min).
 
-> Estos tres valores — proyecto, branch `production`, endpoint `primary` — son los que irán en `config`.
+> Sube el mínimo/máximo de CU si esperas los 7 conectados a la vez (p.ej. min 1, max 4 CU).
 
----
+## A3 · Crear el catálogo/esquema en Unity Catalog (compartido)
 
-## Paso 3 · Crear la base de datos del workshop (UI)
+1. Barra lateral → **Catalog**.
+2. Crea (o elige) un catálogo, p.ej. **`infra_workshop`** (Create catalog → Standard).
+3. Dentro, **Create schema** → `infra_lakebase_ws`.
 
-1. En tu proyecto Lakebase, abre el branch **production** → pestaña **Roles & Databases**
-   (o **Databases**).
-2. Click **Add database**.
-   - **Name:** `infra_ws`
-   - **Owner:** tu usuario (rol por defecto).
-3. Click **Add**. Verás `infra_ws` en la lista.
+> El esquema también lo crea `00_ingesta_datos` con `CREATE SCHEMA IF NOT EXISTS`. El **catálogo**
+> sí debe existir de antemano (o dar permiso de crearlo a los participantes).
 
-> Si tu UI no tiene el botón, puedes crearla luego con SQL: en el notebook `00_setup_conexion`
-> el helper se conecta; alternativamente usa el diálogo **Connect** → copia el `psql` y corre
-> `CREATE DATABASE infra_ws;`.
+## A4 · Ajustar `config.py` con los nombres compartidos y correr la ingesta
 
----
+1. Abre `notebooks/config` y ajusta **lo compartido**: `LAKEBASE_PROJECT`, `UC_CATALOG`,
+   `UC_SCHEMA` y los endpoints de modelos (Paso A5). Deja el `PARTICIPANTE` como esté.
+2. Corre **`00_ingesta_datos`** → carga los Parquet de `data/parquet/` a las tablas Delta.
+3. (Opcional) comparte el Git Folder ya configurado, o indica a cada quien que clone el repo.
 
-## Paso 4 · Crear el catálogo y esquema en Unity Catalog (UI)
+## A5 · Verificar los modelos (Foundation Models)
 
-1. En la barra lateral ve a **Catalog**.
-2. Si no tienes un catálogo destino: click **Create catalog** → nombre (p.ej. `infra_workshop`)
-   → tipo **Standard** → **Create**. *(O usa un catálogo existente donde tengas permisos.)*
-3. Dentro del catálogo, click **Create schema** → nombre `infra_lakebase_ws` → **Create**.
-
-> El esquema también se crea solo al correr `00_ingesta_datos` (hace `CREATE SCHEMA IF NOT EXISTS`),
-> así que este paso es opcional si prefieres dejar que el notebook lo cree. **El catálogo sí debe
-> existir de antemano** (o tener permiso para crearlo).
-
----
-
-## Paso 5 · Verificar los modelos (Foundation Models)
-
-1. En la barra lateral ve a **Serving** (o **Machine Learning → Serving**).
-2. Confirma que existen estos endpoints (o sus equivalentes en el workspace):
+1. Barra lateral → **Serving**.
+2. Confirma estos endpoints (o equivalentes) y ponlos en `config.py`:
    - Embeddings: **`databricks-qwen3-embedding-0-6b`** (multilingüe, 1024 dims).
    - Chat/RAG: **`databricks-claude-opus-4-8`**.
-3. Si tienen otros nombres, anótalos: los pondrás en `config`.
-
-> Si el modelo de embeddings multilingüe no está disponible, puedes usar otro de embeddings del
-> workspace, pero ajusta `EMBED_DIM` a la dimensión que devuelva (ver nota en `config`).
 
 ---
 
-## Paso 6 · Editar `notebooks/config.py`
+# PARTE B · Cada participante
 
-Abre `notebooks/config` en el Git Folder y ajusta los valores a **tu** entorno:
+## B1 · Importar el repo
+
+**Workspace** → **Create** → **Git folder** → URL `https://github.com/juandtbrcks/workshopinfralb`.
+
+## B2 · Poner tu identificador en `config.py`
+
+Abre `notebooks/config` y edita **solo esta línea** con tus iniciales/nombre corto
+(minúsculas, sin espacios):
 
 ```python
-# Lakebase (lo que creaste en el Paso 2 y 3)
-LAKEBASE_PROJECT  = "grupo-infra-ws"     # ← nombre de tu proyecto/instancia Lakebase
-LAKEBASE_BRANCH   = "production"
-LAKEBASE_ENDPOINT = "primary"
-LAKEBASE_DATABASE = "infra_ws"           # ← la base que creaste en el Paso 3
-
-# Unity Catalog (Paso 4)
-UC_CATALOG = "infra_workshop"            # ← TU catálogo
-UC_SCHEMA  = "infra_lakebase_ws"
-
-# Foundation Models (Paso 5)
-EMBED_ENDPOINT = "databricks-qwen3-embedding-0-6b"
-EMBED_DIM      = 1024
-CHAT_ENDPOINT  = "databricks-claude-opus-4-8"
-
-BRANCH_EXPERIMENTO = "experimento-precios"
+PARTICIPANTE = "jgordon"   # ← el tuyo, p.ej. "amlopez"
 ```
 
-Guarda. **Este es el único archivo que necesitas tocar.**
+Con eso, tu base (`infra_ws_jgordon`) y tu branch de la Fase 4 (`experimento-jgordon`) quedan
+aislados. **No cambies** `LAKEBASE_PROJECT`, `UC_CATALOG` ni `UC_SCHEMA` (son los compartidos que
+puso el instructor).
+
+## B3 · Correr el lab
+
+Adjunta cada notebook a un cluster **serverless** y córrelo con **Run all**, en orden:
+
+1. **`05_bootstrap_datos`** — siembra **tu** base Lakebase (crea tu base si no existe, genera
+   embeddings + geometrías). Lee del Delta compartido.
+2. **`01_fase1` → `04_fase4`** — las fases del workshop.
+
+> `00_setup_conexion` y `config` se cargan solos vía `%run` desde cada notebook. `00_setup_conexion`
+> **crea tu base automáticamente** la primera vez. No necesitas correr `00_ingesta_datos` (eso lo
+> hizo el instructor una vez).
 
 ---
 
-## Paso 7 · Cargar los datos y correr el lab
+## De dónde salen los datos de cada fase
 
-En orden (cada notebook se adjunta a un cluster serverless y se corre con **Run all**):
+- **Fase 1** — lee un cliente hospitalario real de `clientes_geo`; los mensajes de la conversación
+  se generan en runtime (la memoria que el agente escribe, no una tabla).
+- **Fase 2** — lee `kb_documentos` (32 docs), genera embeddings hacia tu Lakebase.
+- **Fase 3** — lee `plantas`/`clientes_geo`/`unidades`, las carga como geometrías PostGIS.
+- **Fase 4** — usa tu tabla `productos` (sembrada por `05_bootstrap_datos`) y experimenta con
+  precios sobre **tu** branch aislado.
 
-1. **`00_ingesta_datos`** — carga los Parquet de `data/parquet/` a tablas Delta en tu catálogo.
-2. **`05_bootstrap_datos`** — siembra Lakebase (genera embeddings + geometrías PostGIS).
-3. **`01_fase1` → `04_fase4`** — las fases del workshop.
+## (Opcional) Databricks App
 
-> `00_setup_conexion` y `config` se cargan solos vía `%run` desde cada fase; no los corres directo.
+La app `app/` puede desplegarse una vez (por el instructor) apuntando a una base común, o cada
+quien la suya. Sigue `app/setup_permisos.md` (rol OAuth del service principal) y ajusta
+`app/app.yaml` con los nombres correspondientes.
 
----
+## Checklist
 
-## (Opcional) Paso 8 · Desplegar la Databricks App
+**Instructor:** [ ] repo importado · [ ] proyecto Lakebase · [ ] catálogo+esquema · [ ] modelos
+confirmados en `config` · [ ] `00_ingesta_datos` corrido.
 
-La app **"Asistente de Operaciones INFRA"** (carpeta `app/`) integra las 3 capacidades. Para
-desplegarla en el tenant del cliente, sigue `app/setup_permisos.md` (crea el rol OAuth del service
-principal) y actualiza los `value:` de `app/app.yaml` con los mismos nombres que pusiste en `config`.
-
----
-
-## Checklist rápido
-
-- [ ] Repo importado como Git Folder
-- [ ] Proyecto Lakebase creado (estado Available)
-- [ ] Base `infra_ws` creada
-- [ ] Catálogo + esquema en Unity Catalog
-- [ ] Endpoints de modelos confirmados
-- [ ] `config.py` editado con mis nombres
-- [ ] `00_ingesta_datos` → `05_bootstrap_datos` corridos
-- [ ] Fases 1–4 ejecutadas
+**Participante:** [ ] repo importado · [ ] `PARTICIPANTE` puesto en `config` · [ ]
+`05_bootstrap_datos` corrido · [ ] Fases 1–4 ejecutadas.

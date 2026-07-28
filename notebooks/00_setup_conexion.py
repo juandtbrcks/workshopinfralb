@@ -118,9 +118,31 @@ def get_connection(**kw):
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 4. Probar la conexión y habilitar extensiones
+# MAGIC ## 4. Crear la base de datos del participante (si no existe)
 # MAGIC
-# MAGIC Habilitamos `pgvector` (Fase 2) y `PostGIS` (Fase 3) una sola vez aquí.
+# MAGIC Cada participante trabaja en su propia base `infra_ws_<PARTICIPANTE>` dentro del **proyecto
+# MAGIC Lakebase compartido**. Nos conectamos primero a la base `postgres` por defecto para crearla
+# MAGIC si aún no existe (idempotente: si ya está, no hace nada).
+
+# COMMAND ----------
+
+_admin = get_connection(database="postgres")
+_admin_cur = _admin.cursor()
+_admin_cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (DATABASE,))
+if _admin_cur.fetchone():
+    print(f"ℹ La base '{DATABASE}' ya existe — continuamos")
+else:
+    _admin_cur.execute(f'CREATE DATABASE "{DATABASE}"')
+    print(f"✔ Base '{DATABASE}' creada")
+_admin_cur.close()
+_admin.close()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 5. Probar la conexión y habilitar extensiones
+# MAGIC
+# MAGIC Habilitamos `pgvector` (Fase 2) y `PostGIS` (Fase 3) una sola vez aquí, ya sobre tu base.
 
 # COMMAND ----------
 

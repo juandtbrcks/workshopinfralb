@@ -108,17 +108,21 @@ misma carpeta** (importar el repo completo lo garantiza).
 
 ## Cómo correr el lab
 
-> **Los notebooks leen de las tablas Delta de Unity Catalog** — no traen datos embebidos. Por eso
-> las tablas deben existir antes. Orden recomendado:
+> **Modelo del taller (7 participantes):** infraestructura **compartida** (proyecto Lakebase +
+> tablas Delta, creados por el instructor una vez) y una **base de datos por participante** para
+> que nadie pise los datos de los demás. Detalle completo en **[SETUP.md](SETUP.md)**.
 
-0. **Prerrequisito (una vez):** corre **`00_ingesta_datos`** — carga los Parquet de `data/parquet/`
-   como tablas Delta en el catálogo/esquema de `config`. Luego corre **`05_bootstrap_datos`** para
-   sembrar Lakebase (necesario para la App y para la Fase 4, que lee `productos` de Lakebase).
-1. Adjunta cualquier notebook a un cluster **serverless** o con runtime reciente (el SDK ya viene).
-2. Abre `01_fase1_agentic_state` y ejecuta de arriba a abajo. La **primera celda** instala
-   dependencias (`psycopg2-binary`, `pgvector`, `databricks-sdk`) y reinicia Python; luego
-   `%run ./00_setup_conexion` (que a su vez carga `config`).
-3. Repite con `02`, `03`, `04` en orden.
+**Instructor (una vez):** ajusta lo compartido en `config` y corre **`00_ingesta_datos`** —
+carga los Parquet de `data/parquet/` a las tablas Delta.
+
+**Cada participante:**
+1. En `config`, edita **solo** `PARTICIPANTE = "tus-iniciales"`. Tu base
+   (`infra_ws_<iniciales>`) y tu branch de la Fase 4 quedan aislados. No cambies los valores compartidos.
+2. Adjunta los notebooks a un cluster **serverless** (el SDK ya viene).
+3. Corre **`05_bootstrap_datos`** — crea tu base y la siembra (embeddings + geometrías) desde el
+   Delta compartido.
+4. Corre `01_fase1` → `04_fase4` en orden. La **primera celda** de cada uno instala dependencias
+   y reinicia Python; luego `%run ./00_setup_conexion` (que carga `config` y **crea tu base** si no existe).
 
 **De dónde salen los datos de cada fase:**
 - **Fase 1** — lee un cliente hospitalario real de `clientes_geo`; los mensajes de la
@@ -130,20 +134,23 @@ misma carpeta** (importar el repo completo lo garantiza).
 
 ### Parámetros (widgets)
 
-`00_setup_conexion` expone widgets (`project_id`, `branch`, `endpoint`, `database`). Si el
-instructor asignó otro proyecto/branch por participante, ajústalos ahí.
+Todo se define en `config`. El único valor que cada participante cambia es `PARTICIPANTE`;
+de ahí se derivan su base de datos y su branch. `00_setup_conexion` también expone los valores de
+Lakebase como *widgets* por si quieres override interactivo.
 
 ## Notas para el instructor
 
 - **Tokens OAuth** expiran ~1 h. Si una fase falla por autenticación, re-ejecuta la celda de
   `get_connection()` (regenera el token).
+- **Aislamiento entre participantes:** cada quien tiene su **base** `infra_ws_<PARTICIPANTE>` (toda
+  la escritura ocurre ahí) y su **branch** `experimento-<PARTICIPANTE>` en la Fase 4. Las tablas
+  Delta de UC son compartidas y de solo lectura. 7 bases están muy por debajo del límite (500/branch).
 - **Fase 2** (embeddings en español): elegimos el modelo *multilingüe* `qwen3` a propósito —
   los modelos solo-inglés (`bge`/`gte`) dan relevancia notablemente peor sobre texto en español.
   Es un buen punto de discusión de diseño de RAG con la audiencia.
-- **Fase 4** (branching): `create_branch` del SDK **auto-crea** el endpoint `primary`, por eso el
-  notebook no lo crea aparte. El branch se borra al final (cascada). Si varios participantes
-  corren la fase a la vez, dales `branch_id` distintos (p.ej. `experimento-<iniciales>`) para
-  evitar colisión de nombres.
+- **Fase 4** (branching): el nombre del branch ya es único por participante (`experimento-<PARTICIPANTE>`),
+  así que no hay colisiones aunque corran a la vez. `create_branch` auto-crea el endpoint `primary`
+  y el branch se borra al final (cascada).
 - **Costo:** el proyecto es Autoscaling (escala a cero). Cada branch levanta cómputo temporal
   (0.5–2 CU). Borra branches sobrantes con
   `databricks postgres delete-branch projects/<tu-proyecto>/branches/<branch> -p <perfil>`.

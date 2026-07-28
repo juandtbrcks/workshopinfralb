@@ -10,34 +10,46 @@
 
 # COMMAND ----------
 
+# ═══════════════════════════════════════════════════════════════════
+#  👤 CADA PARTICIPANTE EDITA SOLO ESTA LÍNEA
+# ═══════════════════════════════════════════════════════════════════
+# Pon tus iniciales o nombre corto (solo minúsculas/números, sin espacios).
+# Con esto tu base de datos y tu branch quedan aislados de los demás.
+PARTICIPANTE = "jgordon"     # ← CÁMBIALO, p.ej. "amlopez", "equipo1", etc.
+
 # ─────────────────────────── Lakebase ───────────────────────────
-# Proyecto Lakebase (autoscaling), branch, endpoint y base de datos.
-LAKEBASE_PROJECT  = "grupo-infra-ws"
-LAKEBASE_BRANCH   = "production"
-LAKEBASE_ENDPOINT = "primary"
-LAKEBASE_DATABASE = "infra_ws"
+# El PROYECTO es COMPARTIDO por todo el taller (lo crea el instructor una vez).
+# La BASE DE DATOS es propia de cada participante (deriva de PARTICIPANTE).
+LAKEBASE_PROJECT  = "grupo-infra-ws"          # compartido — no cambiar
+LAKEBASE_BRANCH   = "production"              # compartido — no cambiar
+LAKEBASE_ENDPOINT = "primary"                 # compartido — no cambiar
+LAKEBASE_DATABASE = f"infra_ws_{PARTICIPANTE}"  # propia de cada quien
 
 # ──────────────────── Unity Catalog (datos sintéticos) ────────────────────
-# Esquema donde viven las tablas Delta que alimentan el lab y la app.
-UC_CATALOG = "jgworkspaceclassic_catalog"
-UC_SCHEMA  = "infra_lakebase_ws"
+# COMPARTIDO por todo el taller: las tablas Delta son de SOLO LECTURA (los notebooks
+# leen de aquí y escriben a Lakebase). El instructor corre la ingesta una sola vez.
+UC_CATALOG = "jgworkspaceclassic_catalog"     # compartido — ajusta al catálogo del taller
+UC_SCHEMA  = "infra_lakebase_ws"              # compartido
 
 # ─────────────────────── Foundation Models ───────────────────────
-# Embeddings multilingüe (español) + LLM para RAG.
+# Compartidos (son endpoints del workspace). Embeddings multilingüe + LLM para RAG.
 EMBED_ENDPOINT = "databricks-qwen3-embedding-0-6b"
 EMBED_DIM      = 1024
 CHAT_ENDPOINT  = "databricks-claude-opus-4-8"
 
 # ─────────────────────────── Fase 4 ───────────────────────────
-# Nombre del branch efímero para el experimento de branching.
-# Si varios participantes corren la fase a la vez, dale un sufijo único
-# (p.ej. f"experimento-{tus_iniciales}") para evitar colisiones.
-BRANCH_EXPERIMENTO = "experimento-precios"
+# Branch efímero para el experimento de branching — único por participante
+# (el proyecto es compartido, así que dos branches no pueden llamarse igual).
+BRANCH_EXPERIMENTO = f"experimento-{PARTICIPANTE}"
 
 # COMMAND ----------
 
 print("⚙️  Configuración cargada:")
-print(f"  Lakebase : projects/{LAKEBASE_PROJECT}/branches/{LAKEBASE_BRANCH}/endpoints/{LAKEBASE_ENDPOINT}  ·  db={LAKEBASE_DATABASE}")
-print(f"  UC       : {UC_CATALOG}.{UC_SCHEMA}")
-print(f"  Modelos  : embed={EMBED_ENDPOINT} (dim {EMBED_DIM})  ·  chat={CHAT_ENDPOINT}")
-print(f"  Fase 4   : branch experimento = {BRANCH_EXPERIMENTO}")
+print(f"  Participante : {PARTICIPANTE}")
+print(f"  Lakebase     : projects/{LAKEBASE_PROJECT}/branches/{LAKEBASE_BRANCH}  ·  db={LAKEBASE_DATABASE}")
+print(f"  UC           : {UC_CATALOG}.{UC_SCHEMA}")
+print(f"  Modelos      : embed={EMBED_ENDPOINT} (dim {EMBED_DIM})  ·  chat={CHAT_ENDPOINT}")
+print(f"  Fase 4       : branch experimento = {BRANCH_EXPERIMENTO}")
+
+assert PARTICIPANTE and PARTICIPANTE.replace("_", "").isalnum(), \
+    "PARTICIPANTE debe ser solo letras/números (sin espacios ni acentos)."
