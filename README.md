@@ -17,13 +17,14 @@ Lakebase actúa como el **backend unificado** del agente:
 | Notebook | Fase | Capacidad Lakebase | Resultado |
 |----------|------|--------------------|-----------|
 | `config` | — | Parámetros | **Único lugar** con project/branch/DB, catálogo/esquema UC y modelos |
-| `00_ingesta_datos` | — | Parquet → Delta | Crea las tablas Delta desde `data/parquet/` (primer paso) |
+| `00_ingesta_datos` | — | Parquet → Delta | Crea las tablas Delta desde `data/parquet/` (admin, una vez) |
 | `00_setup_conexion` | — | Conexión + extensiones | Helper `get_connection()` + `pgvector`/`postgis` |
+| `00_bootstrap_datos` | — | Reverse ETL | Siembra tu BD en Lakebase (embeddings, geo, productos, pedidos) |
 | `01_fase1_agentic_state` | 1 | OLTP transaccional | Agente **LangGraph** real (`ChatDatabricks` + tool) con memoria persistida en Lakebase (`PostgresSaver`) |
 | `02_fase2_vector_search` | 2 | `pgvector` | El agente **busca conocimiento** por significado (RAG) |
 | `03_fase3_geospatial` | 3 | `PostGIS` | El agente **razona sobre el espacio** (rutas, cobertura) |
 | `04_fase4_branching` | 4 | Branching | El equipo **experimenta sin riesgo** (DataOps / CI-CD) |
-| `00_bootstrap_datos` | — | Reverse ETL | Carga los datos de UC a Lakebase (KB con embeddings, geo, productos, pedidos) |
+| `05_deploy_app` | — | Guía despliegue | Paso a paso para desplegar la app "Asistente de Operaciones" por la UI |
 
 ### Configuración centralizada
 
@@ -124,11 +125,12 @@ corre **`00_ingesta_datos`** (carga los Parquet de `data/parquet/` a tablas Delt
    tablas Delta compartidas.
 4. Corre `01_fase1` → `04_fase4` en orden. La **primera celda** de cada uno instala dependencias
    y reinicia Python; luego `%run ./00_setup_conexion` (que carga `config` y **crea tu base** si no existe).
+5. *(Opcional)* Sigue **`05_deploy_app`** para desplegar la app web "Asistente de Operaciones" por la UI.
 
 **De dónde salen los datos de cada fase:**
 - **Fase 1** — agente LangGraph: usa `clientes_geo` (identidad del hilo) y `productos` (tool); la
   conversación la persiste el `PostgresSaver` en tablas `checkpoints*` que crea LangGraph.
-- **Fase 2** — lee `kb_documentos` (32 docs), genera embeddings hacia Lakebase.
+- **Fase 2** — lee `kb_documentos` (40 docs), genera embeddings hacia Lakebase.
 - **Fase 3** — lee `plantas`/`clientes_geo`/`unidades`, las carga como geometrías PostGIS.
 - **Fase 4** — lee la tabla `productos` (debe estar sembrada en Lakebase por `00_bootstrap_datos`)
   y experimenta con precios sobre un branch aislado.
