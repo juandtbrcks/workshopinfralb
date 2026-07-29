@@ -23,7 +23,7 @@
 # MAGIC > **Analogía de negocio:** la diferencia entre un empleado nuevo cada día vs. uno que
 # MAGIC > recuerda a tus clientes y sus pendientes.
 # MAGIC >
-# MAGIC > **Prerrequisito:** corre antes **`00_bootstrap_datos`** — este notebook usa las tablas
+# MAGIC > **Prerrequisito:** corre antes **`00_poblar_lakebase`** — este notebook usa las tablas
 # MAGIC > `productos` y `clientes_geo` de tu base Lakebase.
 
 # COMMAND ----------
@@ -73,7 +73,7 @@ _cur.execute("""
 """)
 _conn.commit()
 
-# Poblar solo si están vacías (idempotente: no duplica si ya corriste 00_bootstrap_datos)
+# Poblar solo si están vacías (idempotente: no duplica si ya corriste 00_poblar_lakebase)
 _cur.execute("SELECT count(*) FROM productos")
 if _cur.fetchone()[0] == 0:
     rows = spark.table(f"{UC_CATALOG}.{UC_SCHEMA}.productos").collect()
@@ -287,3 +287,4 @@ pool.close()
 # MAGIC transaccional bajo el capó.
 # MAGIC
 # MAGIC **Siguiente:** `02_fase2_vector_search` — que el agente *busque conocimiento* semánticamente.
+

@@ -1,4 +1,8 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "1"
+# ///
 # MAGIC %md
 # MAGIC # 📥 Ingesta de datos — Parquet → Tablas Delta (Unity Catalog)
 # MAGIC
@@ -16,7 +20,7 @@
 # MAGIC | `pedidos.parquet` | `pedidos` | 200 |
 # MAGIC
 # MAGIC > **Patrón didáctico:** archivos crudos → capa gobernada en Delta/Unity Catalog. Es la
-# MAGIC > entrada del medallón. Desde aquí, `00_bootstrap_datos` sirve estos datos a Lakebase.
+# MAGIC > entrada del medallón. Desde aquí, `00_poblar_lakebase` sirve estos datos a Lakebase.
 
 # COMMAND ----------
 
@@ -118,5 +122,5 @@ display(spark.table(f"{UC_CATALOG}.{UC_SCHEMA}.productos").select("nombre", "cat
 # MAGIC ## ✅ Ingesta completa
 # MAGIC
 # MAGIC Las 6 tablas Delta están en Unity Catalog. Siguientes pasos:
-# MAGIC 1. **`00_bootstrap_datos`** — sirve estos datos a Lakebase (embeddings + geometrías).
+# MAGIC 1. **`00_poblar_lakebase`** — sirve estos datos a Lakebase (embeddings + geometrías).
 # MAGIC 2. **`01`–`04`** — las fases del workshop, que leen de estas tablas.

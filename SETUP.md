@@ -89,7 +89,7 @@ preparó el administrador (solo ajústalos si te avisó que usó nombres distint
 
 Adjunta cada notebook a un cluster **serverless** y córrelo con **Run all**, en orden:
 
-1. **`00_bootstrap_datos`** — crea **tu** base Lakebase y la siembra (embeddings + geometrías),
+1. **`00_poblar_lakebase`** — crea **tu** base Lakebase y la siembra (embeddings + geometrías),
    leyendo de las tablas Delta compartidas.
 2. **`01_fase1` → `04_fase4`** — las fases del workshop.
 
@@ -105,7 +105,7 @@ Adjunta cada notebook a un cluster **serverless** y córrelo con **Run all**, en
   para el identificador del hilo y persiste la conversación en Lakebase con `PostgresSaver`.
 - **Fase 2** — lee `kb_documentos` (32 docs), genera embeddings hacia tu Lakebase.
 - **Fase 3** — lee `plantas`/`clientes_geo`/`unidades`, las carga como geometrías PostGIS.
-- **Fase 4** — usa tu tabla `productos` (sembrada por `00_bootstrap_datos`) y experimenta con
+- **Fase 4** — usa tu tabla `productos` (sembrada por `00_poblar_lakebase`) y experimenta con
   precios sobre **tu** branch aislado.
 
 ## (Opcional) Databricks App
@@ -119,7 +119,7 @@ base común. Sigue `app/setup_permisos.md` (rol OAuth del service principal) y a
 [ ] catálogo + modelos en `config` · [ ] `00_ingesta_datos` corrido.
 
 **Cada participante (Parte B):** [ ] repo importado · [ ] `PARTICIPANTE` en `config` ·
-[ ] `00_bootstrap_datos` corrido · [ ] Fases 1–4 ejecutadas.
+[ ] `00_poblar_lakebase` corrido · [ ] Fases 1–4 ejecutadas.
 
 ## Limpieza (post-workshop)
 

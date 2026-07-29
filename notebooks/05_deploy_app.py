@@ -161,7 +161,7 @@
 # MAGIC
 # MAGIC | Paso | Qué hiciste | Capacidad Lakebase |
 # MAGIC |------|-------------|-------------------|
-# MAGIC | Setup | `00_bootstrap_datos` | Reverse ETL (Delta → Lakebase) |
+# MAGIC | Setup | `00_poblar_lakebase` | Reverse ETL (Delta → Lakebase) |
 # MAGIC | Fase 1 | Agente con memoria | OLTP transaccional (PostgresSaver) |
 # MAGIC | Fase 2 | Búsqueda semántica | pgvector (embeddings + índice HNSW) |
 # MAGIC | Fase 3 | Inteligencia geoespacial | PostGIS (geography, ST_Distance) |
@@ -179,3 +179,4 @@
 # MAGIC > - Agregar más tools al agente (e.g., crear pedidos, asignar rutas)
 # MAGIC > - Configurar Reverse ETL con Synced Tables (Delta → Lakebase automático)
 # MAGIC > - Montar un pipeline CI/CD con branching (un branch por PR)
+

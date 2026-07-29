@@ -19,7 +19,7 @@ Lakebase actúa como el **backend unificado** del agente:
 | `config` | — | Parámetros | **Único lugar** con project/branch/DB, catálogo/esquema UC y modelos |
 | `00_ingesta_datos` | — | Parquet → Delta | Crea las tablas Delta desde `data/parquet/` (admin, una vez) |
 | `00_setup_conexion` | — | Conexión + extensiones | Helper `get_connection()` + `pgvector`/`postgis` |
-| `00_bootstrap_datos` | — | Reverse ETL | Siembra tu BD en Lakebase (embeddings, geo, productos, pedidos) |
+| `00_poblar_lakebase` | — | Reverse ETL | Siembra tu BD en Lakebase (embeddings, geo, productos, pedidos) |
 | `01_fase1_agentic_state` | 1 | OLTP transaccional | Agente **LangGraph** real (`ChatDatabricks` + tool) con memoria persistida en Lakebase (`PostgresSaver`) |
 | `02_fase2_vector_search` | 2 | `pgvector` | El agente **busca conocimiento** por significado (RAG) |
 | `03_fase3_geospatial` | 3 | `PostGIS` | El agente **razona sobre el espacio** (rutas, cobertura) |
@@ -53,7 +53,7 @@ Datos curados con sentido de negocio de Grupo Infra, incluidos como **archivos P
 | `pedidos.parquet` | `pedidos` | 250 | App — pedidos/entregas |
 
 > Son datos **sintéticos** (no información real de Grupo Infra), aptos para un repo compartido.
-> El flujo es: `data/parquet/*.parquet` → **`00_ingesta_datos`** → tablas Delta → **`00_bootstrap_datos`** → Lakebase.
+> El flujo es: `data/parquet/*.parquet` → **`00_ingesta_datos`** → tablas Delta → **`00_poblar_lakebase`** → Lakebase.
 
 ## Databricks App: "Asistente de Operaciones INFRA"
 
@@ -121,7 +121,7 @@ corre **`00_ingesta_datos`** (carga los Parquet de `data/parquet/` a tablas Delt
 1. Importa el repo como Git Folder. En `config`, edita **solo** `PARTICIPANTE = "tus-iniciales"`.
    Tu base (`infra_ws_<iniciales>`) y tu branch de la Fase 4 quedan aislados. No cambies los valores compartidos.
 2. Adjunta los notebooks a un cluster **serverless** (el SDK ya viene).
-3. Corre **`00_bootstrap_datos`** — crea tu base y la siembra (embeddings + geometrías) desde las
+3. Corre **`00_poblar_lakebase`** — crea tu base y la siembra (embeddings + geometrías) desde las
    tablas Delta compartidas.
 4. Corre `01_fase1` → `04_fase4` en orden. La **primera celda** de cada uno instala dependencias
    y reinicia Python; luego `%run ./00_setup_conexion` (que carga `config` y **crea tu base** si no existe).
@@ -131,7 +131,7 @@ corre **`00_ingesta_datos`** (carga los Parquet de `data/parquet/` a tablas Delt
   conversación la persiste el `PostgresSaver` en tablas `checkpoints*` que crea LangGraph.
 - **Fase 2** — lee `kb_documentos` (32 docs), genera embeddings hacia Lakebase.
 - **Fase 3** — lee `plantas`/`clientes_geo`/`unidades`, las carga como geometrías PostGIS.
-- **Fase 4** — lee la tabla `productos` (debe estar sembrada en Lakebase por `00_bootstrap_datos`)
+- **Fase 4** — lee la tabla `productos` (debe estar sembrada en Lakebase por `00_poblar_lakebase`)
   y experimenta con precios sobre un branch aislado.
 
 ### Parámetros

@@ -35,14 +35,14 @@
 # MAGIC dato que NO queremos arriesgar.
 # MAGIC
 # MAGIC > **Prerrequisito:** la tabla `productos` debe estar poblada en Lakebase. La siembra el
-# MAGIC > notebook `00_bootstrap_datos` desde la tabla Delta `{UC_CATALOG}.{UC_SCHEMA}.productos`.
+# MAGIC > notebook `00_poblar_lakebase` desde la tabla Delta `{UC_CATALOG}.{UC_SCHEMA}.productos`.
 
 # COMMAND ----------
 
 conn = get_connection()   # conecta al branch 'production' por defecto
 cur = conn.cursor()
 
-# Usamos la tabla real de productos (poblada desde Delta por el notebook 00_bootstrap_datos).
+# Usamos la tabla real de productos (poblada desde Delta por el notebook 00_poblar_lakebase).
 # Este es el catálogo de precios que NO queremos arriesgar.
 cur.execute("SELECT nombre, precio_mxn FROM productos ORDER BY nombre;")
 filas = cur.fetchall()
@@ -187,3 +187,4 @@ print(f"🗑️  Branch '{BRANCH_EXP}' eliminado (cascada: endpoint + datos). Pr
 # MAGIC **La gran idea:** Lakebase unifica estado transaccional, semántico y geoespacial de una
 # MAGIC aplicación agéntica en un solo Postgres gestionado, gobernado por Unity Catalog y cercano
 # MAGIC al lago analítico. Menos sistemas, menos integración, más velocidad.
+

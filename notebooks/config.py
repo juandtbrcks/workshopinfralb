@@ -17,7 +17,7 @@
 # El PROYECTO Lakebase y el CATÁLOGO/ESQUEMA son COMPARTIDOS (los crea el participante
 # administrador una vez). De este valor se derivan TU base de datos y TU branch, para
 # que trabajes aislado de tus compañeros.
-PARTICIPANTE = "jgordon"     # ← CÁMBIALO, p.ej. "amlopez", "equipo1", etc.
+PARTICIPANTE = "jgordon2"     # ← CÁMBIALO, p.ej. "amlopez", "equipo1", etc.
 
 # ─────────────────────────── Lakebase ───────────────────────────
 # El PROYECTO es COMPARTIDO por todo el taller (lo crea el administrador una vez).
