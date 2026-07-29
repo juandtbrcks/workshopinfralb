@@ -45,12 +45,12 @@ Datos curados con sentido de negocio de Grupo Infra, incluidos como **archivos P
 
 | Archivo Parquet | → Tabla Delta | Filas | Alimenta |
 |-----------------|---------------|-------|----------|
-| `kb_documentos.parquet` | `kb_documentos` | 32 | Fase 2 — HDS de gases, procedimientos, tickets, normatividad |
-| `plantas.parquet` | `plantas` | 5 | Fase 3 — plantas de llenado (zona metro CDMX) |
-| `clientes_geo.parquet` | `clientes_geo` | 20 | Fase 3 — hospitales/industrias/distribuidores |
-| `unidades.parquet` | `unidades` | 6 | Fase 3 — unidades de reparto |
-| `productos.parquet` | `productos` | 12 | App / Fase 4 — catálogo de gases con precios |
-| `pedidos.parquet` | `pedidos` | 200 | App — pedidos/entregas |
+| `kb_documentos.parquet` | `kb_documentos` | 40 | Fase 2 — HDS de gases, procedimientos, tickets, normatividad |
+| `plantas.parquet` | `plantas` | 7 | Fase 3 — plantas de llenado (CDMX, Toluca, Cuernavaca) |
+| `clientes_geo.parquet` | `clientes_geo` | 25 | Fase 3 — hospitales, industrias, laboratorios, educación |
+| `unidades.parquet` | `unidades` | 8 | Fase 3 — unidades de reparto |
+| `productos.parquet` | `productos` | 15 | App / Fase 4 — catálogo de gases (incl. especiales y mezclas) |
+| `pedidos.parquet` | `pedidos` | 250 | App — pedidos/entregas |
 
 > Son datos **sintéticos** (no información real de Grupo Infra), aptos para un repo compartido.
 > El flujo es: `data/parquet/*.parquet` → **`00_ingesta_datos`** → tablas Delta → **`00_bootstrap_datos`** → Lakebase.
@@ -125,12 +125,11 @@ corre **`00_ingesta_datos`** (carga los Parquet de `data/parquet/` a tablas Delt
    tablas Delta compartidas.
 4. Corre `01_fase1` → `04_fase4` en orden. La **primera celda** de cada uno instala dependencias
    y reinicia Python; luego `%run ./00_setup_conexion` (que carga `config` y **crea tu base** si no existe).
-5. *(Opcional)* Sigue **`05_deploy_app`** para desplegar la app web "Asistente de Operaciones" por la UI.
 
 **De dónde salen los datos de cada fase:**
 - **Fase 1** — agente LangGraph: usa `clientes_geo` (identidad del hilo) y `productos` (tool); la
   conversación la persiste el `PostgresSaver` en tablas `checkpoints*` que crea LangGraph.
-- **Fase 2** — lee `kb_documentos` (40 docs), genera embeddings hacia Lakebase.
+- **Fase 2** — lee `kb_documentos` (32 docs), genera embeddings hacia Lakebase.
 - **Fase 3** — lee `plantas`/`clientes_geo`/`unidades`, las carga como geometrías PostGIS.
 - **Fase 4** — lee la tabla `productos` (debe estar sembrada en Lakebase por `00_bootstrap_datos`)
   y experimenta con precios sobre un branch aislado.
