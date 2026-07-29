@@ -19,7 +19,7 @@ Lakebase actúa como el **backend unificado** del agente:
 | `config` | — | Parámetros | **Único lugar** con project/branch/DB, catálogo/esquema UC y modelos |
 | `00_ingesta_datos` | — | Parquet → Delta | Crea las tablas Delta desde `data/parquet/` (primer paso) |
 | `00_setup_conexion` | — | Conexión + extensiones | Helper `get_connection()` + `pgvector`/`postgis` |
-| `01_fase1_agentic_state` | 1 | OLTP transaccional | El agente **recuerda** (memoria corto/largo plazo + checkpoints) |
+| `01_fase1_agentic_state` | 1 | OLTP transaccional | Agente **LangGraph** real (`ChatDatabricks` + tool) con memoria persistida en Lakebase (`PostgresSaver`) |
 | `02_fase2_vector_search` | 2 | `pgvector` | El agente **busca conocimiento** por significado (RAG) |
 | `03_fase3_geospatial` | 3 | `PostGIS` | El agente **razona sobre el espacio** (rutas, cobertura) |
 | `04_fase4_branching` | 4 | Branching | El equipo **experimenta sin riesgo** (DataOps / CI-CD) |
@@ -126,8 +126,8 @@ corre **`00_ingesta_datos`** (carga los Parquet de `data/parquet/` a tablas Delt
    y reinicia Python; luego `%run ./00_setup_conexion` (que carga `config` y **crea tu base** si no existe).
 
 **De dónde salen los datos de cada fase:**
-- **Fase 1** — lee un cliente hospitalario real de `clientes_geo`; los mensajes de la
-  conversación se generan en runtime (es la memoria que el agente escribe, no una tabla).
+- **Fase 1** — agente LangGraph: usa `clientes_geo` (identidad del hilo) y `productos` (tool); la
+  conversación la persiste el `PostgresSaver` en tablas `checkpoints*` que crea LangGraph.
 - **Fase 2** — lee `kb_documentos` (32 docs), genera embeddings hacia Lakebase.
 - **Fase 3** — lee `plantas`/`clientes_geo`/`unidades`, las carga como geometrías PostGIS.
 - **Fase 4** — lee la tabla `productos` (debe estar sembrada en Lakebase por `05_bootstrap_datos`)

@@ -1,27 +1,30 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 🧠 Fase 1 — Memoria a Largo Plazo del Agente (Agentic State)
+# MAGIC # 🧠 Fase 1 — Memoria del Agente con LangGraph (Agentic State)
 # MAGIC
 # MAGIC **El problema:** los LLMs no tienen memoria. Cada llamada empieza en blanco. Un agente
-# MAGIC de operaciones que olvida quién eres, qué pediste ayer y en qué punto quedó el reparto
-# MAGIC es inútil en producción.
+# MAGIC de operaciones que olvida quién eres y en qué punto quedó el reparto es inútil en producción.
 # MAGIC
-# MAGIC **La solución:** persistir el *estado del agente* en un almacén transaccional rápido.
-# MAGIC Lakebase (Postgres OLTP) es ideal: lecturas/escrituras en milisegundos, transacciones ACID,
-# MAGIC y escala a cero cuando el agente está inactivo.
+# MAGIC **La solución:** un agente **LangGraph** real cuyo *estado* (la conversación) se **persiste
+# MAGIC en Lakebase** mediante el `PostgresSaver` (checkpointer). Lakebase es Postgres OLTP: baja
+# MAGIC latencia, transacciones ACID y escala a cero cuando el agente está inactivo — justo lo que
+# MAGIC necesita el estado de un agente.
 # MAGIC
-# MAGIC **Qué construimos en esta fase:**
-# MAGIC - `agent_sessions` — cada conversación del Asistente de Operaciones INFRA con un usuario.
-# MAGIC - `agent_messages` — historial de mensajes (memoria de corto plazo / contexto).
-# MAGIC - `agent_memory` — hechos duraderos que el agente "recuerda" entre sesiones (memoria de largo plazo).
-# MAGIC - `agent_checkpoints` — estado serializado del agente para reanudar tareas largas.
+# MAGIC **Qué construimos:**
+# MAGIC - Un agente **ReAct** (`create_react_agent`) con el LLM de Databricks (`ChatDatabricks`).
+# MAGIC - Una *tool* que consulta inventario (datos reales de Lakebase).
+# MAGIC - Memoria persistente: cada conversación es un `thread_id`; LangGraph guarda los
+# MAGIC   *checkpoints* en Lakebase y los recupera al reanudar.
 # MAGIC
-# MAGIC > **Analogía de negocio:** es la diferencia entre un empleado nuevo cada día vs. uno que
-# MAGIC > conoce a tus clientes y recuerda pendientes.
+# MAGIC > **Analogía de negocio:** la diferencia entre un empleado nuevo cada día vs. uno que
+# MAGIC > recuerda a tus clientes y sus pendientes.
+# MAGIC >
+# MAGIC > **Prerrequisito:** corre antes **`05_bootstrap_datos`** — este notebook usa las tablas
+# MAGIC > `productos` y `clientes_geo` de tu base Lakebase.
 
 # COMMAND ----------
 
-# MAGIC %pip install --quiet psycopg2-binary pgvector databricks-sdk --upgrade
+# MAGIC %pip install --quiet "langgraph>=1.1,<2" "langgraph-prebuilt>=1.0.9" langgraph-checkpoint-postgres "psycopg[binary]" psycopg-pool databricks-langchain "databricks-sdk>=0.100.0"
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -31,239 +34,182 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 1. Esquema de memoria del agente
+# MAGIC ## 1. Conexión de LangGraph a Lakebase (checkpointer)
 # MAGIC
-# MAGIC Modelamos las tablas que todo framework agéntico (LangGraph, custom, etc.) necesita.
+# MAGIC LangGraph persiste el estado con `PostgresSaver`, que usa **psycopg v3** sobre un *pool* de
+# MAGIC conexiones. Reutilizamos los datos de conexión del helper (`lakebase_conn_params`, definido en
+# MAGIC `00_setup_conexion`) para armar el *conninfo* apuntando a **tu** base.
 
 # COMMAND ----------
 
-conn = get_connection()
-cur = conn.cursor()
+from psycopg_pool import ConnectionPool
+from langgraph.checkpoint.postgres import PostgresSaver
 
-cur.execute("""
-CREATE TABLE IF NOT EXISTS agent_sessions (
-    session_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id      TEXT NOT NULL,
-    channel      TEXT DEFAULT 'app',           -- app, whatsapp, call-center
-    started_at   TIMESTAMPTZ DEFAULT now(),
-    last_seen_at TIMESTAMPTZ DEFAULT now(),
-    status       TEXT DEFAULT 'active'         -- active, closed
-);
-
-CREATE TABLE IF NOT EXISTS agent_messages (
-    message_id   BIGSERIAL PRIMARY KEY,
-    session_id   UUID REFERENCES agent_sessions(session_id) ON DELETE CASCADE,
-    role         TEXT NOT NULL,                -- user, assistant, tool
-    content      TEXT NOT NULL,
-    created_at   TIMESTAMPTZ DEFAULT now()
-);
-
--- Memoria de largo plazo: hechos que persisten ENTRE sesiones (por usuario)
-CREATE TABLE IF NOT EXISTS agent_memory (
-    memory_id    BIGSERIAL PRIMARY KEY,
-    user_id      TEXT NOT NULL,
-    memory_key   TEXT NOT NULL,                -- p.ej. 'cliente_preferente', 'gas_frecuente'
-    memory_value TEXT NOT NULL,
-    confidence   REAL DEFAULT 1.0,
-    updated_at   TIMESTAMPTZ DEFAULT now(),
-    UNIQUE (user_id, memory_key)
-);
-
--- Checkpoint: estado serializado para reanudar flujos largos (JSONB)
-CREATE TABLE IF NOT EXISTS agent_checkpoints (
-    session_id   UUID PRIMARY KEY REFERENCES agent_sessions(session_id) ON DELETE CASCADE,
-    state        JSONB NOT NULL,
-    updated_at   TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_messages_session ON agent_messages(session_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_memory_user      ON agent_memory(user_id);
-""")
-
-print("✔ Esquema de memoria del agente creado")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 2. Funciones de memoria (la "API" del agente)
-# MAGIC
-# MAGIC Encapsulamos las operaciones que el agente invoca. En producción estas serían *tools*
-# MAGIC del agente o llamadas de tu framework.
-
-# COMMAND ----------
-
-import json
-
-def start_session(user_id, channel="app"):
-    cur.execute(
-        "INSERT INTO agent_sessions (user_id, channel) VALUES (%s, %s) RETURNING session_id",
-        (user_id, channel),
-    )
-    return cur.fetchone()[0]
-
-def add_message(session_id, role, content):
-    cur.execute(
-        "INSERT INTO agent_messages (session_id, role, content) VALUES (%s, %s, %s)",
-        (session_id, role, content),
-    )
-    cur.execute("UPDATE agent_sessions SET last_seen_at = now() WHERE session_id = %s", (session_id,))
-
-def get_history(session_id, limit=20):
-    cur.execute(
-        "SELECT role, content, created_at FROM agent_messages WHERE session_id = %s ORDER BY created_at LIMIT %s",
-        (session_id, limit),
-    )
-    return cur.fetchall()
-
-def remember(user_id, key, value, confidence=1.0):
-    """Guarda/actualiza un hecho de largo plazo (upsert)."""
-    cur.execute(
-        """INSERT INTO agent_memory (user_id, memory_key, memory_value, confidence)
-           VALUES (%s, %s, %s, %s)
-           ON CONFLICT (user_id, memory_key)
-           DO UPDATE SET memory_value = EXCLUDED.memory_value,
-                         confidence   = EXCLUDED.confidence,
-                         updated_at   = now()""",
-        (user_id, key, value, confidence),
-    )
-
-def recall(user_id):
-    """Recupera todo lo que el agente sabe de este usuario."""
-    cur.execute(
-        "SELECT memory_key, memory_value, confidence FROM agent_memory WHERE user_id = %s ORDER BY updated_at DESC",
-        (user_id,),
-    )
-    return cur.fetchall()
-
-def save_checkpoint(session_id, state: dict):
-    cur.execute(
-        """INSERT INTO agent_checkpoints (session_id, state) VALUES (%s, %s)
-           ON CONFLICT (session_id) DO UPDATE SET state = EXCLUDED.state, updated_at = now()""",
-        (session_id, json.dumps(state)),
-    )
-
-def load_checkpoint(session_id):
-    cur.execute("SELECT state FROM agent_checkpoints WHERE session_id = %s", (session_id,))
-    row = cur.fetchone()
-    return row[0] if row else None
-
-print("✔ API de memoria lista: start_session, add_message, get_history, remember, recall, save/load_checkpoint")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 3. Simulación: una conversación con el Asistente de Operaciones INFRA
-# MAGIC
-# MAGIC Tomamos un **cliente real** de la tabla `clientes_geo` (Unity Catalog) y simulamos su
-# MAGIC conversación con el agente. Los mensajes se generan en runtime (así funciona un agente:
-# MAGIC escribe su memoria conforme conversa), pero el cliente y sus datos salen de la tabla.
-# MAGIC
-# MAGIC > **Prerrequisito:** la tabla Delta `clientes_geo` existe (`data/02_geo.sql`).
-
-# COMMAND ----------
-
-# Elegimos un cliente hospitalario real desde Delta
-cliente = (
-    spark.table(f"{UC_CATALOG}.{UC_SCHEMA}.clientes_geo")
-         .where("tipo = 'hospital'")
-         .orderBy("cliente_id")
-         .first()
+_p = lakebase_conn_params()   # host + token OAuth + usuario, hacia tu base infra_ws_<PARTICIPANTE>
+CONNINFO = (
+    f"host={_p['host']} port={_p['port']} dbname={_p['dbname']} "
+    f"user={_p['user']} password={_p['password']} sslmode=require"
 )
-USER = cliente["cliente_id"]
-NOMBRE_CLIENTE = cliente["nombre"]
-print(f"Cliente: {NOMBRE_CLIENTE} (user_id={USER}, segmento={cliente['segmento']})")
 
-# El agente recuerda lo que aprendió en sesiones anteriores
-memoria_previa = recall(USER)
-print("\nMemoria de largo plazo ANTES de la sesión:")
-print("  (vacía — primer contacto)" if not memoria_previa else "")
-for k, v, c in memoria_previa:
-    print(f"  · {k} = {v} (conf {c})")
-
-# Nueva sesión
-sid = start_session(USER, channel="whatsapp")
-print(f"\nSesión iniciada: {sid}")
-
-add_message(sid, "user",      "Hola, necesito reabastecer oxígeno medicinal para el hospital.")
-add_message(sid, "assistant", "Con gusto. ¿Confirmas entrega en la misma dirección registrada como la última vez?")
-add_message(sid, "user",      "Sí, misma dirección. Y por favor siempre cilindros de 6m³.")
-add_message(sid, "assistant", "Anotado. Programo oxígeno medicinal, cilindros de 6m³.")
-
-# El agente EXTRAE y PERSISTE hechos de largo plazo (el nombre viene de la tabla real)
-remember(USER, "razon_social",      NOMBRE_CLIENTE)
-remember(USER, "producto_frecuente", "Oxígeno medicinal")
-remember(USER, "presentacion_pref",  "Cilindro 6m³")
-
-print("✔ Conversación registrada y hechos aprendidos")
+# min_size >= 1 y max_size >= min_size (requisito de psycopg_pool)
+pool = ConnectionPool(conninfo=CONNINFO, min_size=1, max_size=4, kwargs={"autocommit": True})
+checkpointer = PostgresSaver(pool)
+checkpointer.setup()   # crea las tablas checkpoints/* la primera vez (idempotente)
+print("✔ Checkpointer de LangGraph listo sobre Lakebase")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 4. Checkpoint: pausar y reanudar una tarea larga
+# MAGIC ## 2. El LLM y una herramienta con datos reales
 # MAGIC
-# MAGIC El pedido requiere validar crédito + inventario + agendar ruta. Guardamos el estado
-# MAGIC intermedio para poder reanudar aunque el proceso se interrumpa.
+# MAGIC Usamos `ChatDatabricks` con el endpoint de `config` (`CHAT_ENDPOINT`). Le damos al agente una
+# MAGIC *tool* que consulta el catálogo de productos en Lakebase — así el agente combina
+# MAGIC razonamiento del LLM con datos operacionales reales.
 
 # COMMAND ----------
 
-save_checkpoint(sid, {
-    "flujo": "reabastecimiento",
-    "paso_actual": "validacion_credito",
-    "pasos_completados": ["captura_pedido"],
-    "pedido": {"cliente": NOMBRE_CLIENTE, "producto": "O2 medicinal", "presentacion": "6m3", "cantidad": 12},
-})
+from databricks_langchain import ChatDatabricks
+from langgraph.prebuilt import create_react_agent
 
-estado = load_checkpoint(sid)
-print("Checkpoint recuperado:")
-print(json.dumps(estado, indent=2, ensure_ascii=False))
+llm = ChatDatabricks(endpoint=CHAT_ENDPOINT, max_tokens=400)
+
+def _consulta(sql, params=()):
+    """Ejecuta una consulta breve sobre Lakebase (usando el pool psycopg3 de LangGraph)."""
+    with pool.connection() as c:
+        cur = c.execute(sql, params)
+        cols = [d.name for d in cur.description]
+        return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+def consultar_producto(nombre: str) -> str:
+    """Consulta precio y características de un gas en el catálogo de Grupo Infra.
+
+    Args:
+        nombre: nombre (o parte) del producto, p.ej. 'oxígeno medicinal', 'acetileno'.
+    """
+    filas = _consulta(
+        """SELECT nombre, categoria, presentacion, precio_mxn, es_comburente, es_inflamable
+           FROM productos WHERE lower(nombre) LIKE lower(%s) LIMIT 3""",
+        (f"%{nombre}%",),
+    )
+    if not filas:
+        return f"No encontré productos que coincidan con '{nombre}'."
+    out = []
+    for f in filas:
+        flags = []
+        if f["es_comburente"]: flags.append("comburente")
+        if f["es_inflamable"]: flags.append("inflamable")
+        riesgo = f" ({', '.join(flags)})" if flags else ""
+        out.append(f"{f['nombre']} — {f['presentacion']}: ${f['precio_mxn']} MXN{riesgo}")
+    return "\n".join(out)
+
+SYSTEM = (
+    "Eres el Asistente de Operaciones de Grupo Infra (gases industriales y medicinales). "
+    "Responde en español, con precisión y priorizando la seguridad. Usa la herramienta "
+    "consultar_producto para precios y características. Sé conciso y cordial."
+)
+
+agente = create_react_agent(llm, tools=[consultar_producto], checkpointer=checkpointer,
+                            prompt=SYSTEM)
+print("✔ Agente ReAct creado (LLM + tool + memoria en Lakebase)")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 5. El valor: memoria que persiste entre sesiones
+# MAGIC ## 3. Identificar al cliente (dato real de la tabla)
 # MAGIC
-# MAGIC Días después, el mismo cliente vuelve. El agente **ya lo conoce** — no vuelve a preguntar.
+# MAGIC El `thread_id` de LangGraph identifica cada conversación. Usamos un cliente real de
+# MAGIC `clientes_geo` para que su `cliente_id` sea el hilo de su memoria.
 
 # COMMAND ----------
 
-print(f"El agente recuerda a {USER}:")
-for k, v, c in recall(USER):
-    print(f"  · {k:20s} → {v}")
-
-print("\nHistorial de la sesión previa:")
-for role, content, ts in get_history(sid):
-    print(f"  [{role:9s}] {content}")
+cliente = _consulta("SELECT cliente_id, nombre FROM clientes_geo WHERE tipo='hospital' ORDER BY cliente_id LIMIT 1")[0]
+THREAD = {"configurable": {"thread_id": f"cliente-{cliente['cliente_id']}"}}
+print(f"Cliente: {cliente['nombre']} (thread_id = cliente-{cliente['cliente_id']})")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 6. (Opcional) Observabilidad: métricas operativas del agente
+# MAGIC ## 4. Conversación — Turno 1
 # MAGIC
-# MAGIC Como es Postgres, monitorear el estado del agente es SQL puro. Esto alimenta dashboards
-# MAGIC de observabilidad (tema de la sección teórica).
+# MAGIC El cliente se presenta y pregunta por un producto. El agente usa la tool y responde.
 
 # COMMAND ----------
 
-cur.execute("""
-SELECT
-  (SELECT count(*) FROM agent_sessions)                        AS sesiones,
-  (SELECT count(*) FROM agent_messages)                        AS mensajes,
-  (SELECT count(DISTINCT user_id) FROM agent_memory)           AS usuarios_con_memoria,
-  (SELECT count(*) FROM agent_checkpoints)                     AS checkpoints_activos;
-""")
-sesiones, mensajes, usuarios, checkpoints = cur.fetchone()
-print(f"📊 Sesiones: {sesiones} | Mensajes: {mensajes} | Usuarios con memoria: {usuarios} | Checkpoints: {checkpoints}")
+def responder(texto):
+    r = agente.invoke({"messages": [("user", texto)]}, THREAD)
+    return r["messages"][-1].content
+
+print("👤", "Hola, soy del hospital. ¿Cuánto cuesta el oxígeno medicinal?")
+print("\n🤖", responder("Hola, soy del hospital. ¿Cuánto cuesta el oxígeno medicinal?"))
 
 # COMMAND ----------
 
-conn.close()
+# MAGIC %md
+# MAGIC ## 5. Conversación — Turno 2 (la memoria en acción)
+# MAGIC
+# MAGIC En el **mismo `thread_id`**, preguntamos algo que solo se puede responder recordando el turno
+# MAGIC anterior. El agente NO recibe de nuevo el contexto: lo recupera de Lakebase.
+
+# COMMAND ----------
+
+print("👤", "¿También manejan acetileno? ¿es peligroso guardarlo con lo que pregunté antes?")
+print("\n🤖", responder("¿También manejan acetileno? ¿es peligroso guardarlo con lo que pregunté antes?"))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 6. La prueba: el estado está PERSISTIDO en Lakebase
+# MAGIC
+# MAGIC LangGraph escribió los *checkpoints* en tu base. Podemos verlos con SQL (es Postgres), y
+# MAGIC recuperar el estado del hilo — esto es lo que permite reanudar una conversación días después.
+
+# COMMAND ----------
+
+# Tablas que creó el checkpointer + cuántos checkpoints tiene este hilo
+tablas = _consulta("""SELECT table_name FROM information_schema.tables
+                  WHERE table_schema='public' AND table_name LIKE 'checkpoint%%' ORDER BY 1""")
+print("Tablas del checkpointer en Lakebase:", [t["table_name"] for t in tablas])
+
+n = _consulta("SELECT count(*) AS n FROM checkpoints WHERE thread_id=%s",
+          (f"cliente-{cliente['cliente_id']}",))[0]["n"]
+print(f"Checkpoints guardados para este cliente: {n}")
+
+# Recuperar el estado más reciente del hilo (como haría el agente al reanudar)
+estado = agente.get_state(THREAD)
+print(f"\nMensajes en la memoria del hilo: {len(estado.values['messages'])}")
+for m in estado.values["messages"]:
+    rol = getattr(m, "type", "?")
+    contenido = (m.content or "").strip().replace("\n", " ")
+    if contenido:
+        print(f"  [{rol:9s}] {contenido[:80]}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 7. Reanudar en una "nueva sesión"
+# MAGIC
+# MAGIC Simulamos que el cliente vuelve más tarde: creamos el agente **desde cero** apuntando al
+# MAGIC mismo `thread_id`. Como el estado vive en Lakebase, el agente lo retoma sin repetir nada.
+
+# COMMAND ----------
+
+agente_nuevo = create_react_agent(llm, tools=[consultar_producto], checkpointer=checkpointer, prompt=SYSTEM)
+r = agente_nuevo.invoke({"messages": [("user", "¿Qué te había preguntado sobre precios?")]}, THREAD)
+print("👤 (nueva sesión) ¿Qué te había preguntado sobre precios?")
+print("\n🤖", r["messages"][-1].content)
+
+# COMMAND ----------
+
+pool.close()
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## ✅ Fase 1 completa
 # MAGIC
-# MAGIC Le dimos al agente **memoria transaccional persistente** sobre Lakebase:
-# MAGIC memoria de corto plazo (mensajes), largo plazo (hechos del cliente) y checkpoints (reanudar tareas).
+# MAGIC Construimos un **agente LangGraph real** (`ChatDatabricks` + tool con datos de Lakebase) cuya
+# MAGIC **memoria persiste en Lakebase** vía `PostgresSaver`. Vimos que recuerda el contexto entre
+# MAGIC turnos y que puede **reanudar** una conversación desde el estado guardado — todo con SQL
+# MAGIC transaccional bajo el capó.
 # MAGIC
 # MAGIC **Siguiente:** `02_fase2_vector_search` — que el agente *busque conocimiento* semánticamente.

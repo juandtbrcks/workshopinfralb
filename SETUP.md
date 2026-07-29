@@ -101,8 +101,8 @@ Adjunta cada notebook a un cluster **serverless** y córrelo con **Run all**, en
 
 ## De dónde salen los datos de cada fase
 
-- **Fase 1** — lee un cliente hospitalario real de `clientes_geo`; los mensajes de la conversación
-  se generan en runtime (la memoria que el agente escribe, no una tabla).
+- **Fase 1** — agente **LangGraph** (`ChatDatabricks` + tool sobre `productos`); usa `clientes_geo`
+  para el identificador del hilo y persiste la conversación en Lakebase con `PostgresSaver`.
 - **Fase 2** — lee `kb_documentos` (32 docs), genera embeddings hacia tu Lakebase.
 - **Fase 3** — lee `plantas`/`clientes_geo`/`unidades`, las carga como geometrías PostGIS.
 - **Fase 4** — usa tu tabla `productos` (sembrada por `05_bootstrap_datos`) y experimenta con
