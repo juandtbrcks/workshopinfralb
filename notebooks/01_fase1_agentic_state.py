@@ -204,6 +204,29 @@ print("\n🤖", r["messages"][-1].content)
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ## 8. ¡Prueba tu propia pregunta!
+# MAGIC
+# MAGIC El agente aún recuerda toda la conversación anterior. Escribe lo que quieras en la celda
+# MAGIC siguiente — puedes preguntar por otro producto, hacer referencia a lo que ya platicaron,
+# MAGIC o probar si realmente recuerda el contexto.
+# MAGIC
+# MAGIC > **Ideas para probar:**
+# MAGIC > - *"¿Tienen nitrógeno líquido?"* (producto nuevo)
+# MAGIC > - *"¿Cuál de los dos gases que te pregunté es más caro?"* (memoria)
+# MAGIC > - *"¿Puedo almacenar los dos juntos?"* (seguridad + contexto)
+
+# COMMAND ----------
+
+# DBTITLE 1,Haz tu propia pregunta al agente
+# ✂️ Cambia esta pregunta por la tuya:
+mi_pregunta = "¿Cuál de los productos que te pregunté es más caro?"
+
+print(f"👤 {mi_pregunta}")
+print(f"\n🤖 {responder(mi_pregunta)}")
+
+# COMMAND ----------
+
 pool.close()
 
 # COMMAND ----------
