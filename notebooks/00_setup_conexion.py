@@ -1,4 +1,8 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "5"
+# ///
 # MAGIC %md
 # MAGIC # 🧪 Workshop Lakebase · Grupo Infra
 # MAGIC ## Notebook 00 — Setup y Conexión
@@ -22,6 +26,12 @@
 # MAGIC > **Nota para la audiencia mixta:** cada notebook empieza con el *por qué de negocio* antes
 # MAGIC > del código. Si vienes del lado técnico, el código es ejecutable tal cual; si vienes de
 # MAGIC > negocio, los bloques markdown te cuentan la historia completa.
+
+# COMMAND ----------
+
+# DBTITLE 1,Upgrade databricks-sdk for Lakebase support
+# MAGIC %pip install --upgrade "databricks-sdk>=0.118.0" -q
+# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 

@@ -1,4 +1,8 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "5"
+# ///
 # MAGIC %md
 # MAGIC # 🧠 Fase 1 — Memoria del Agente con LangGraph (Agentic State)
 # MAGIC
@@ -19,7 +23,7 @@
 # MAGIC > **Analogía de negocio:** la diferencia entre un empleado nuevo cada día vs. uno que
 # MAGIC > recuerda a tus clientes y sus pendientes.
 # MAGIC >
-# MAGIC > **Prerrequisito:** corre antes **`05_bootstrap_datos`** — este notebook usa las tablas
+# MAGIC > **Prerrequisito:** corre antes **`00_bootstrap_datos`** — este notebook usa las tablas
 # MAGIC > `productos` y `clientes_geo` de tu base Lakebase.
 
 # COMMAND ----------
@@ -30,6 +34,76 @@
 # COMMAND ----------
 
 # MAGIC %run ./00_setup_conexion
+
+# COMMAND ----------
+
+# DBTITLE 1,Crear tablas de negocio si no existen (idempotente)
+# ── Asegura que las tablas de negocio existen en tu BD de Lakebase ──────────────
+# Cada participante tiene su propia BD; si es nueva, estas tablas no existen aún.
+# Las creamos desde las tablas Delta compartidas (UC) para que Fase 1 sea autocontenida.
+
+import psycopg2
+
+_conn = get_connection()
+_cur = _conn.cursor()
+
+# --- productos (la tool del agente la consulta) ---
+_cur.execute("""
+    CREATE TABLE IF NOT EXISTS productos (
+        producto_id   SERIAL PRIMARY KEY,
+        nombre        TEXT NOT NULL,
+        categoria     TEXT,
+        presentacion  TEXT,
+        precio_mxn    NUMERIC(10,2),
+        es_comburente BOOLEAN DEFAULT FALSE,
+        es_inflamable BOOLEAN DEFAULT FALSE
+    )
+""")
+
+# --- clientes_geo (identidad del hilo de conversación) ---
+_cur.execute("""
+    CREATE TABLE IF NOT EXISTS clientes_geo (
+        cliente_id    SERIAL PRIMARY KEY,
+        nombre        TEXT NOT NULL,
+        tipo          TEXT,
+        direccion     TEXT,
+        lat           DOUBLE PRECISION,
+        lon           DOUBLE PRECISION
+    )
+""")
+_conn.commit()
+
+# Poblar solo si están vacías (idempotente: no duplica si ya corriste 00_bootstrap_datos)
+_cur.execute("SELECT count(*) FROM productos")
+if _cur.fetchone()[0] == 0:
+    rows = spark.table(f"{UC_CATALOG}.{UC_SCHEMA}.productos").collect()
+    for r in rows:
+        _cur.execute(
+            "INSERT INTO productos (nombre, categoria, presentacion, precio_mxn, es_comburente, es_inflamable) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
+            (r["nombre"], r["categoria"], r["presentacion"], r["precio_mxn"], r["es_comburente"], r["es_inflamable"])
+        )
+    _conn.commit()
+    print(f"✔ Tabla 'productos' creada y poblada ({len(rows)} filas desde Delta)")
+else:
+    print("✔ Tabla 'productos' ya existía")
+
+_cur.execute("SELECT count(*) FROM clientes_geo")
+if _cur.fetchone()[0] == 0:
+    rows = spark.table(f"{UC_CATALOG}.{UC_SCHEMA}.clientes_geo").collect()
+    for r in rows:
+        _cur.execute(
+            "INSERT INTO clientes_geo (nombre, tipo, direccion, lat, lon) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            (r["nombre"], r["tipo"], r["direccion"], r["lat"], r["lon"])
+        )
+    _conn.commit()
+    print(f"✔ Tabla 'clientes_geo' creada y poblada ({len(rows)} filas desde Delta)")
+else:
+    print("✔ Tabla 'clientes_geo' ya existía")
+
+_cur.close()
+_conn.close()
 
 # COMMAND ----------
 
