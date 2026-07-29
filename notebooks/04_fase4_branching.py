@@ -162,13 +162,33 @@ conn_prod.close()
 # MAGIC %md
 # MAGIC ## 7. Limpieza: borrar el branch experimental
 # MAGIC
-# MAGIC Terminado el experimento, borramos el branch (cascada: elimina su endpoint y datos).
-# MAGIC En un flujo de CI/CD esto es automático al cerrar el Pull Request.
+# MAGIC Terminado el experimento, puedes borrar el branch. Tienes **dos opciones**:
+# MAGIC
+# MAGIC ### Opción A — Desde la interfaz gráfica (recomendado para explorar)
+# MAGIC
+# MAGIC 1. Barra lateral → **Compute** → **Database instances**
+# MAGIC 2. Click en **`grupo-infra-ws`**
+# MAGIC 3. En el panel izquierdo, selecciona **Branches**
+# MAGIC 4. Busca tu branch **`experimento-<tu-participante>`**
+# MAGIC 5. Click en los 3 puntos (⋮) → **Delete branch**
+# MAGIC 6. Confirma la eliminación
+# MAGIC
+# MAGIC > 💡 Antes de borrar, explora el branch: seleccionalo y navega sus tablas, verás que tiene
+# MAGIC > los precios con el +12% aplicado. Produccion sigue intacta.
+# MAGIC
+# MAGIC ### Opción B — Desde código (para automatización / CI-CD)
+# MAGIC
+# MAGIC En un flujo automatizado (CI/CD, cleanup de Pull Requests), el borrado se hace
+# MAGIC por código. La siguiente celda es **opcional** — descoméntala solo si prefieres
+# MAGIC borrar por código en vez de la UI:
 
 # COMMAND ----------
 
-_w.postgres.delete_branch(f"{parent}/branches/{BRANCH_EXP}")
-print(f"🗑️  Branch '{BRANCH_EXP}' eliminado (cascada: endpoint + datos). Producción intacta.")
+# ✂️ OPCIONAL: descomenta las siguientes líneas para borrar el branch desde código.
+# Si ya lo borraste desde la UI, no es necesario ejecutar esta celda.
+
+# _w.postgres.delete_branch(f"{parent}/branches/{BRANCH_EXP}")
+# print(f"🗑️  Branch '{BRANCH_EXP}' eliminado (cascada: endpoint + datos). Producción intacta.")
 
 # COMMAND ----------
 
