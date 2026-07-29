@@ -1,4 +1,8 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "5"
+# ///
 # MAGIC %md
 # MAGIC # 🌿 Fase 4 — Experimentación Segura con Branching
 # MAGIC
@@ -187,4 +191,3 @@ print(f"🗑️  Branch '{BRANCH_EXP}' eliminado (cascada: endpoint + datos). Pr
 # MAGIC **La gran idea:** Lakebase unifica estado transaccional, semántico y geoespacial de una
 # MAGIC aplicación agéntica en un solo Postgres gestionado, gobernado por Unity Catalog y cercano
 # MAGIC al lago analítico. Menos sistemas, menos integración, más velocidad.
-
